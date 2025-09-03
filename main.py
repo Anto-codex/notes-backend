@@ -1,6 +1,3 @@
-@app.get("/")
-def root():
-    return {"message": "Notes API is live 🚀"}
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
@@ -33,9 +30,14 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Notes App API",
     version="1.0.0",
-    docs_url="/docs",      # Swagger UI explicitly enabled
-    redoc_url=None         # Disable ReDoc (optional)
+    docs_url="/docs",
+    redoc_url=None
 )
+
+# Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Notes API is live 🚀"}
 
 # Pydantic schemas
 class Note(BaseModel):
@@ -74,4 +76,3 @@ def get_note(note_id: str):
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
     return Note(title=note.title, content=note.content)
-
