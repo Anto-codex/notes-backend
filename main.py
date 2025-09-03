@@ -5,6 +5,11 @@ import uuid
 
 app = FastAPI(title="Notes App API", version="1.0.0")
 
+# 🔹 Root route
+@app.get("/")
+def read_root():
+    return {"message": "Notes API is live 🚀"}
+
 # Temporary storage (later you can switch to DB)
 notes = {}
 
@@ -34,22 +39,3 @@ def get_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     return notes[note_id]
 
-@app.put("/notes/{note_id}", response_model=NoteResponse)
-def update_note(note_id: str, note: Note):
-    if note_id not in notes:
-        raise HTTPException(status_code=404, detail="Note not found")
-    notes[note_id].update({"title": note.title, "content": note.content})
-    return notes[note_id]
-
-@app.delete("/notes/{note_id}")
-def delete_note(note_id: str):
-    if note_id not in notes:
-        raise HTTPException(status_code=404, detail="Note not found")
-    del notes[note_id]
-    return {"success": True}
-
-@app.get("/share/{note_id}", response_model=NoteResponse)
-def share_note(note_id: str):
-    if note_id not in notes:
-        raise HTTPException(status_code=404, detail="Note not found")
-    return notes[note_id]
