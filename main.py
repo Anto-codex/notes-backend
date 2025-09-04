@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import os
@@ -34,7 +35,16 @@ app = FastAPI(
     redoc_url=None
 )
 
-# Root endpoint
+# CORS middleware (allow frontend to call backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For demo; later replace with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Root endpoint to check API is live
 @app.get("/")
 def root():
     return {"message": "Notes API is live 🚀"}
@@ -44,6 +54,9 @@ class Note(BaseModel):
     title: str
     content: str
 
+class NoteResponse(Note):
+    id: str
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal()
@@ -52,8 +65,8 @@ def get_db():
     finally:
         db.close()
 
-# Routes
-@app.post("/notes/", response_model=Note)
+# Create note
+@app.post("/notes/", response_model=NoteResponse)
 def create_note(note: Note):
     db = next(get_db())
     note_id = str(uuid.uuid4())
@@ -61,18 +74,20 @@ def create_note(note: Note):
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
-    return note
+    return NoteResponse(id=db_note.id, title=db_note.title, content=db_note.content)
 
-@app.get("/notes/", response_model=List[Note])
+# List all notes
+@app.get("/notes/", response_model=List[NoteResponse])
 def list_notes():
     db = next(get_db())
     notes = db.query(NoteModel).all()
-    return [Note(title=n.title, content=n.content) for n in notes]
+    return [NoteResponse(id=n.id, title=n.title, content=n.content) for n in notes]
 
-@app.get("/notes/{note_id}", response_model=Note)
+# Get note by ID
+@app.get("/notes/{note_id}", response_model=NoteResponse)
 def get_note(note_id: str):
     db = next(get_db())
     note = db.query(NoteModel).filter(NoteModel.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    return Note(title=note.title, content=note.content)
+    return NoteResponse(id=note.id, title=note.title, content=note.content)
