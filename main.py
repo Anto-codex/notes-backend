@@ -35,26 +35,21 @@ app = FastAPI(
     redoc_url=None
 )
 
-# CORS middleware
+# Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict this in production
+    allow_origins=["*"],  # Or set your frontend URL for security
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
-# Pydantic schemas
+# Pydantic schema
 class Note(BaseModel):
     title: str
     content: str
 
-# Root endpoint
-@app.get("/")
-def root():
-    return {"message": "Notes API is live 🚀"}
-
-# Dependency
+# Dependency to get DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -62,7 +57,12 @@ def get_db():
     finally:
         db.close()
 
-# CRUD routes
+# Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Notes API is live 🚀"}
+
+# Create a new note
 @app.post("/notes/", response_model=Note)
 def create_note(note: Note):
     db = next(get_db())
@@ -71,14 +71,16 @@ def create_note(note: Note):
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
-    return note
+    return Note(title=db_note.title, content=db_note.content)
 
+# List all notes
 @app.get("/notes/", response_model=List[Note])
 def list_notes():
     db = next(get_db())
     notes = db.query(NoteModel).all()
     return [Note(title=n.title, content=n.content) for n in notes]
 
+# Get note by ID
 @app.get("/notes/{note_id}", response_model=Note)
 def get_note(note_id: str):
     db = next(get_db())
@@ -87,6 +89,7 @@ def get_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     return Note(title=note.title, content=note.content)
 
+# Delete note by ID
 @app.delete("/notes/{note_id}")
 def delete_note(note_id: str):
     db = next(get_db())
@@ -95,4 +98,5 @@ def delete_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     db.delete(note)
     db.commit()
-    return {"message": f"Note {note_id} deleted successfully"}
+    return {"message": "Note deleted successfully"}
+
