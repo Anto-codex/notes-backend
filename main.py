@@ -8,12 +8,10 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import uuid
 
 # Load DATABASE_URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL not set in environment variables")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./notes.db")  # fallback for local testing
 
 # SQLAlchemy setup
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -24,24 +22,17 @@ class NoteModel(Base):
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
 
-# Create table
 Base.metadata.create_all(bind=engine)
 
 # FastAPI app
-app = FastAPI(
-    title="Notes App API",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url=None
-)
+app = FastAPI(title="Notes App API", version="1.0.0")
 
-# Enable CORS
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or set your frontend URL for security
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 # Pydantic schema
@@ -57,12 +48,11 @@ def get_db():
     finally:
         db.close()
 
-# Root endpoint
+# Routes
 @app.get("/")
 def root():
     return {"message": "Notes API is live 🚀"}
 
-# Create a new note
 @app.post("/notes/", response_model=Note)
 def create_note(note: Note):
     db = next(get_db())
@@ -71,16 +61,14 @@ def create_note(note: Note):
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
-    return Note(title=db_note.title, content=db_note.content)
+    return note
 
-# List all notes
 @app.get("/notes/", response_model=List[Note])
 def list_notes():
     db = next(get_db())
     notes = db.query(NoteModel).all()
-    return [Note(title=n.title, content=n.content) for n in notes]
+    return [Note(title=n.title, content=n.content, id=n.id) if hasattr(n, 'id') else Note(title=n.title, content=n.content) for n in notes]
 
-# Get note by ID
 @app.get("/notes/{note_id}", response_model=Note)
 def get_note(note_id: str):
     db = next(get_db())
@@ -89,7 +77,6 @@ def get_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     return Note(title=note.title, content=note.content)
 
-# Delete note by ID
 @app.delete("/notes/{note_id}")
 def delete_note(note_id: str):
     db = next(get_db())
@@ -98,5 +85,4 @@ def delete_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     db.delete(note)
     db.commit()
-    return {"message": "Note deleted successfully"}
-
+    return {"message": f"Note {note_id} deleted successfully"}
