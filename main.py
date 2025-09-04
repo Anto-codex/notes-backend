@@ -24,24 +24,35 @@ class NoteModel(Base):
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
 
+# Create table
 Base.metadata.create_all(bind=engine)
 
 # FastAPI app
-app = FastAPI(title="Notes App API", version="1.0.0", docs_url="/docs", redoc_url=None)
+app = FastAPI(
+    title="Notes App API",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url=None
+)
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # or your frontend URL
+    allow_origins=["*"],  # You can restrict this in production
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-# Pydantic schema
+# Pydantic schemas
 class Note(BaseModel):
     title: str
     content: str
+
+# Root endpoint
+@app.get("/")
+def root():
+    return {"message": "Notes API is live 🚀"}
 
 # Dependency
 def get_db():
@@ -51,11 +62,7 @@ def get_db():
     finally:
         db.close()
 
-# Routes
-@app.get("/")
-def root():
-    return {"message": "Notes API is live 🚀"}
-
+# CRUD routes
 @app.post("/notes/", response_model=Note)
 def create_note(note: Note):
     db = next(get_db())
@@ -80,24 +87,12 @@ def get_note(note_id: str):
         raise HTTPException(status_code=404, detail="Note not found")
     return Note(title=note.title, content=note.content)
 
-@app.put("/notes/{note_id}", response_model=Note)
-def update_note(note_id: str, note: Note):
-    db = next(get_db())
-    db_note = db.query(NoteModel).filter(NoteModel.id == note_id).first()
-    if not db_note:
-        raise HTTPException(status_code=404, detail="Note not found")
-    db_note.title = note.title
-    db_note.content = note.content
-    db.commit()
-    db.refresh(db_note)
-    return note
-
 @app.delete("/notes/{note_id}")
 def delete_note(note_id: str):
     db = next(get_db())
-    db_note = db.query(NoteModel).filter(NoteModel.id == note_id).first()
-    if not db_note:
+    note = db.query(NoteModel).filter(NoteModel.id == note_id).first()
+    if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    db.delete(db_note)
+    db.delete(note)
     db.commit()
-    return {"detail": "Note deleted successfully"}
+    return {"message": f"Note {note_id} deleted successfully"}
